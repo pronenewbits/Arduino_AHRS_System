@@ -88,8 +88,6 @@ The electrical connection can be seen here:
 
 You only need to use 4 jumper cables to connect them: +3.3VCC, GND, I2C's SDA, and I2C's SCL (the MPU-9250 support SPI and I2C communication mode, but we use only I2C here). 
 
-To communicate with the MPU-9250, I use I2C MPU-9250 library from [bolderflight project](https://github.com/bolderflight/MPU9250).
-
 
 ### Programming Implementation
 
@@ -114,11 +112,14 @@ In this state, point the sensor into the 'north direction' of your choice and se
 
 # How to Use
 
-Just place one of the implementation folder ("[ahrs_ekf_engl](ahrs_ekf_engl)" or "[ahrs_ukf_engl](ahrs_ukf_engl)") in your Arduino installation folder and run with it! Inside each folder you will find these files:
+Just place one of the implementation folder ("[ahrs_ekf](ahrs_ekf)" or "[ahrs_ukf](ahrs_ukf)") in your Arduino installation folder and run with it! Inside each folder you will find these files:
 - `matrix.h/cpp` : The backbone of all my code in this account. This files contain the class for Matrix operation.
 - `ekf.h/cpp` or `ukf.h/cpp` : The source files of the EKF/UKF Class.
 - `konfig.h` : The configuration file.
+- `simple_mpu9250.h` : MPU-9250 I2C library, it is a simplified version of MPU-9250 library from [bolderflight project](https://github.com/bolderflight/MPU9250).
 - `*.ino` : The arduino main file.
+
+
 
 For the data visualization, I use script modified from [FreeIMU project](http://www.varesano.net/files/FreeIMU-20121122_1126.zip) (You need [Processing to run these script](https://processing.org/)). Just place the "[FreeIMU_cube](FreeIMU_cube)" folder in your Processing installation folder and run the script. 
 You need to run the script **after** you finished the calibration procedure described above in ***Programming Implementation*** section above (if not, the AHRS system will use the bias & north data from the identification I did which might be not valid anymore for your hardware/location).
