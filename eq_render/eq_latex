@@ -1,0 +1,14 @@
+
+
+bias_sensor.gif             B=\begin{bmatrix}B_{x}&B_{y}&B_{z}\end{bmatrix}^T
+deformity_sensor.gif        \begin{bmatrix}D_{xx}&D_{xy}&D_{xz}\\D_{yx}&D_{yy}&D_{yz}\\D_{zx}&D_{zy}&D_{zz}\end{bmatrix}
+true_sensor.gif             T_{true}=\begin{bmatrix}T_{x}&T_{y}&T_{z}\end{bmatrix}^T
+measured_sensor.gif         S_{sensor}=\begin{bmatrix}S_{x}&S_{y}&S_{z}\end{bmatrix}^T
+
+sensor_calib_eq.gif         \begin{bmatrix}T_{x}\\T_{y}\\T_{z}\end{bmatrix}=
+                            \begin{bmatrix}D_{xx}&D_{xy}&D_{xz}\\D_{yx}&D_{yy}&D_{yz}\\D_{zx}&D_{zy}&D_{zz}\end{bmatrix}
+                            \left(\begin{bmatrix}S_{x}\\S_{y}\\S_{z}\end{bmatrix}-\begin{bmatrix}B_{x}\\B_{y}\\B_{z}\end{bmatrix}\right)
+                            
+                            
+                            
+                            
