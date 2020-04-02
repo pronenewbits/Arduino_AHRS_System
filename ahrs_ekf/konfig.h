@@ -11,6 +11,8 @@
 #include <stdint.h>
 #include <math.h>
 
+#define PAKAI_MAGNET
+
 
 /* State Space dimension */
 #define SS_X_LEN    (4)

@@ -14,15 +14,15 @@ Matrix RLS_P(4,4);              /* Inverse of correction estimation */
 Matrix RLS_in(4,1);             /* Input data */
 Matrix RLS_out(1,1);            /* Output data */
 Matrix RLS_gain(4,1);           /* RLS gain */
-uint32_t RLS_u32iterData = 0;       /* To track how much data we take */
+uint32_t RLS_u32iterData = 0;   /* To track how much data we take */
 
 
 /* ================================================= UKF Variables/function declaration ================================================= */
 /* UKF initialization constant */
-#define P_INIT      (10.)
-#define Rv_INIT     (1e-6)
-#define Rn_INIT_ACC (0.0015)
-#define Rn_INIT_MAG (0.0015)
+#define P_INIT       (10.)
+#define Rv_INIT      (1e-6)
+#define Rn_INIT_ACC  (0.0015/10.)
+#define Rn_INIT_MAG  (0.0015/10.)
 /* P(k=0) variable --------------------------------------------------------------------------------------------------------- */
 float_prec UKF_PINIT_data[SS_X_LEN*SS_X_LEN] = {P_INIT, 0,      0,      0,
                                                 0,      P_INIT, 0,      0,
@@ -46,8 +46,6 @@ Matrix UKF_Rn(SS_Z_LEN, SS_Z_LEN, UKF_Rn_data);
 /* Nonlinear & linearization function -------------------------------------------------------------------------------------- */
 bool Main_bUpdateNonlinearX(Matrix &X_Next, Matrix &X, Matrix &U);
 bool Main_bUpdateNonlinearY(Matrix &Y, Matrix &X, Matrix &U);
-bool Main_bCalcJacobianF(Matrix &F, Matrix &X, Matrix &U);
-bool Main_bCalcJacobianH(Matrix &H, Matrix &X, Matrix &U);
 /* UKF variables ----------------------------------------------------------------------------------------------------------- */
 Matrix quaternionData(SS_X_LEN, 1);
 Matrix Y(SS_Z_LEN, 1);
@@ -61,11 +59,11 @@ UKF UKF_IMU(quaternionData, UKF_PINIT, UKF_Rv, UKF_Rn, Main_bUpdateNonlinearX, M
 #define IMU_ACC_Z0          (1)
 
 /* Magnetic vector constant (align with local magnetic vector) */
-float_prec IMU_MAG_B0_data[3] = {-0.239, -0.831, 0.502};
+float_prec IMU_MAG_B0_data[3] = {cos(0), sin(0), 0.000000};
 Matrix IMU_MAG_B0(3, 1, IMU_MAG_B0_data);
-   
+
 /* The hard-magnet bias */
-float_prec HARD_IRON_BIAS_data[3] = {15.507348, 5.4278485, 13.934539};
+float_prec HARD_IRON_BIAS_data[3] = {8.832973, 7.243323, 23.95714};
 Matrix HARD_IRON_BIAS(3, 1, HARD_IRON_BIAS_data);
 
 /* An MPU9250 object with the MPU-9250 sensor on I2C bus 0 with address 0x68 */
@@ -95,9 +93,9 @@ void setup() {
     /* Serial initialization -------------------------------------- */
     Serial.begin(115200);
     while(!Serial) {}
+    Serial.println("Calibrating IMU bias...");
 
     /* IMU initialization ----------------------------------------- */
-    Serial.println("IMU initialization, calibrating gyro bias...");
     int status = IMU.begin();   /* start communication with IMU */
     if (status < 0) {
         Serial.println("IMU initialization unsuccessful");
@@ -142,7 +140,7 @@ void loop() {
         float p = IMU.getGyroX_rads();
         float q = IMU.getGyroY_rads();
         float r = IMU.getGyroZ_rads();
-        
+            
         if (STATE_AHRS == STATE_UKF_RUNNING) {  /* Run the UKF algorithm */
             
             /* ================== Read the sensor data / simulate the system here ================== */
@@ -325,9 +323,9 @@ void loop() {
                 
                 /* Normalizing the acceleration vector & projecting the gravitational vector (gravity is negative acceleration) */
                 float_prec _normG = sqrt((Ax * Ax) + (Ay * Ay) + (Az * Az));
-                Ax = -Ax / _normG;
-                Ay = -Ay / _normG;
-                Az = -Az / _normG;
+                Ax = Ax / _normG;
+                Ay = Ay / _normG;
+                Az = Az / _normG;
                 
                 /* Normalizing the magnetic vector */
                 _normG = sqrt((Bx * Bx) + (By * By) + (Bz * Bz));
@@ -340,11 +338,12 @@ void loop() {
                 float roll = asin(Ay/cos(pitch));
                 float m_tilt_x =  Bx*cos(pitch)             + By*sin(roll)*sin(pitch)   + Bz*cos(roll)*sin(pitch);
                 float m_tilt_y =                            + By*cos(roll)              - Bz*sin(roll);
-                float m_tilt_z = -Bx*sin(pitch)             + By*sin(roll)*cos(pitch)   + Bz*cos(roll)*cos(pitch);
+                /* float m_tilt_z = -Bx*sin(pitch)             + By*sin(roll)*cos(pitch)   + Bz*cos(roll)*cos(pitch); */
                 
-                IMU_MAG_B0[0][0] = m_tilt_x;
-                IMU_MAG_B0[1][0] = m_tilt_y;
-                IMU_MAG_B0[2][0] = m_tilt_z;
+                float mag_dec = atan2(m_tilt_y, m_tilt_x);
+                IMU_MAG_B0[0][0] = cos(mag_dec);
+                IMU_MAG_B0[1][0] = sin(mag_dec);
+                IMU_MAG_B0[2][0] = 0;
                 
                 Serial.println("North identification finished, the north vector identified:");
                 snprintf(bufferTxSer, sizeof(bufferTxSer)-1, "%.3f %.3f %.3f\r\n", IMU_MAG_B0[0][0], IMU_MAG_B0[1][0], IMU_MAG_B0[2][0]);
@@ -460,83 +459,6 @@ bool Main_bUpdateNonlinearY(Matrix &Y, Matrix &X, Matrix &U)
     Y[5][0] = (2*(q1*q3+q0*q2)) * IMU_MAG_B0[0][0]
              +(2*(q2*q3-q0*q1)) * IMU_MAG_B0[1][0]
              +(+(q0_2)-(q1_2)-(q2_2)+(q3_2)) * IMU_MAG_B0[2][0];
-    return true;
-}
-
-bool Main_bCalcJacobianF(Matrix &F, Matrix &X, Matrix &U)
-{
-    /* In Main_bUpdateNonlinearX():
-     *  q0 = q0 + q0_dot * dT;
-     *  q1 = q1 + q1_dot * dT;
-     *  q2 = q2 + q2_dot * dT;
-     *  q3 = q3 + q3_dot * dT;
-     */
-    float_prec p, q, r;
-
-    p = U[0][0];
-    q = U[1][0];
-    r = U[2][0];
-
-    F[0][0] =  1.000;
-    F[1][0] =  0.5*p * SS_DT;
-    F[2][0] =  0.5*q * SS_DT;
-    F[3][0] =  0.5*r * SS_DT;
-
-    F[0][1] = -0.5*p * SS_DT;
-    F[1][1] =  1.000;
-    F[2][1] = -0.5*r * SS_DT;
-    F[3][1] =  0.5*q * SS_DT;
-
-    F[0][2] = -0.5*q * SS_DT;
-    F[1][2] =  0.5*r * SS_DT;
-    F[2][2] =  1.000;
-    F[3][2] = -0.5*p * SS_DT;
-
-    F[0][3] = -0.5*r * SS_DT;
-    F[1][3] = -0.5*q * SS_DT;
-    F[2][3] =  0.5*p * SS_DT;
-    F[3][3] =  1.000;
-    
-    return true;
-}
-
-bool Main_bCalcJacobianH(Matrix &H, Matrix &X, Matrix &U)
-{
-    float_prec q0, q1, q2, q3;
-
-    q0 = X[0][0];
-    q1 = X[1][0];
-    q2 = X[2][0];
-    q3 = X[3][0];
-    
-    H[0][0] = -2*q2 * IMU_ACC_Z0;
-    H[1][0] = +2*q1 * IMU_ACC_Z0;
-    H[2][0] = +2*q0 * IMU_ACC_Z0;
-    H[3][0] =  2*q0*IMU_MAG_B0[0][0] + 2*q3*IMU_MAG_B0[1][0] - 2*q2*IMU_MAG_B0[2][0];
-    H[4][0] = -2*q3*IMU_MAG_B0[0][0] + 2*q0*IMU_MAG_B0[1][0] + 2*q1*IMU_MAG_B0[2][0];
-    H[5][0] =  2*q2*IMU_MAG_B0[0][0] - 2*q1*IMU_MAG_B0[1][0] + 2*q0*IMU_MAG_B0[2][0];
-    
-    H[0][1] = +2*q3 * IMU_ACC_Z0;
-    H[1][1] = +2*q0 * IMU_ACC_Z0;
-    H[2][1] = -2*q1 * IMU_ACC_Z0;
-    H[3][1] =  2*q1*IMU_MAG_B0[0][0]+2*q2*IMU_MAG_B0[1][0] + 2*q3*IMU_MAG_B0[2][0];
-    H[4][1] =  2*q2*IMU_MAG_B0[0][0]-2*q1*IMU_MAG_B0[1][0] + 2*q0*IMU_MAG_B0[2][0];
-    H[5][1] =  2*q3*IMU_MAG_B0[0][0]-2*q0*IMU_MAG_B0[1][0] - 2*q1*IMU_MAG_B0[2][0];
-    
-    H[0][2] = -2*q0 * IMU_ACC_Z0;
-    H[1][2] = +2*q3 * IMU_ACC_Z0;
-    H[2][2] = -2*q2 * IMU_ACC_Z0;
-    H[3][2] = -2*q2*IMU_MAG_B0[0][0]+2*q1*IMU_MAG_B0[1][0] - 2*q0*IMU_MAG_B0[2][0];
-    H[4][2] =  2*q1*IMU_MAG_B0[0][0]+2*q2*IMU_MAG_B0[1][0] + 2*q3*IMU_MAG_B0[2][0];
-    H[5][2] =  2*q0*IMU_MAG_B0[0][0]+2*q3*IMU_MAG_B0[1][0] - 2*q2*IMU_MAG_B0[2][0];
-    
-    H[0][3] = +2*q1 * IMU_ACC_Z0;
-    H[1][3] = +2*q2 * IMU_ACC_Z0;
-    H[2][3] = +2*q3 * IMU_ACC_Z0;
-    H[3][3] = -2*q3*IMU_MAG_B0[0][0]+2*q0*IMU_MAG_B0[1][0] + 2*q1*IMU_MAG_B0[2][0];
-    H[4][3] = -2*q0*IMU_MAG_B0[0][0]-2*q3*IMU_MAG_B0[1][0] + 2*q2*IMU_MAG_B0[2][0];
-    H[5][3] =  2*q1*IMU_MAG_B0[0][0]+2*q2*IMU_MAG_B0[1][0] + 2*q3*IMU_MAG_B0[2][0];
-    
     return true;
 }
 

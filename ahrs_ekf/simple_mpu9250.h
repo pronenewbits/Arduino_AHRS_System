@@ -196,6 +196,7 @@ public:
         _gx = ((float)(_gxcounts) * _gyroScale) - _gxb;
         _gy = ((float)(_gycounts) * _gyroScale) - _gyb;
         _gz = ((float)(_gzcounts) * _gyroScale) - _gzb;
+        
         /* Transform the magnetomer to align with the Accelerometer and Gyroscope Axis */
         float _hxAK8963 = ((float)_hxcounts) * _magScaleX;
         float _hyAK8963 = ((float)_hycounts) * _magScaleY;
@@ -203,7 +204,7 @@ public:
         _hx =  _hyAK8963;
         _hy =  _hxAK8963;
         _hz = -_hzAK8963;
-
+        
         return 1;
     }
     

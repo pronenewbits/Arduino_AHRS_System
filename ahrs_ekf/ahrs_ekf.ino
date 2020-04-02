@@ -14,15 +14,15 @@ Matrix RLS_P(4,4);              /* Inverse of correction estimation */
 Matrix RLS_in(4,1);             /* Input data */
 Matrix RLS_out(1,1);            /* Output data */
 Matrix RLS_gain(4,1);           /* RLS gain */
-uint32_t RLS_u32iterData = 0;       /* To track how much data we take */
+uint32_t RLS_u32iterData = 0;   /* To track how much data we take */
 
 
 /* ================================================= EKF Variables/function declaration ================================================= */
 /* EKF initialization constant */
 #define P_INIT      (10.)
 #define Q_INIT      (1e-6)
-#define R_INIT_ACC  (0.0015)
-#define R_INIT_MAG  (0.0015)
+#define R_INIT_ACC  (0.0015/10.)
+#define R_INIT_MAG  (0.0015/10.)
 /* P(k=0) variable --------------------------------------------------------------------------------------------------------- */
 float_prec EKF_PINIT_data[SS_X_LEN*SS_X_LEN] = {P_INIT, 0,      0,      0,
                                                 0,      P_INIT, 0,      0,
@@ -62,11 +62,11 @@ EKF EKF_IMU(quaternionData, EKF_PINIT, EKF_QINIT, EKF_RINIT,
 #define IMU_ACC_Z0          (1)
 
 /* Magnetic vector constant (align with local magnetic vector) */
-float_prec IMU_MAG_B0_data[3] = {-0.239, -0.831, 0.502};
+float_prec IMU_MAG_B0_data[3] = {cos(0), sin(0), 0.000000};
 Matrix IMU_MAG_B0(3, 1, IMU_MAG_B0_data);
-   
+
 /* The hard-magnet bias */
-float_prec HARD_IRON_BIAS_data[3] = {15.507348, 5.4278485, 13.934539};
+float_prec HARD_IRON_BIAS_data[3] = {8.832973, 7.243323, 23.95714};
 Matrix HARD_IRON_BIAS(3, 1, HARD_IRON_BIAS_data);
 
 /* An MPU9250 object with the MPU-9250 sensor on I2C bus 0 with address 0x68 */
@@ -143,7 +143,7 @@ void loop() {
         float p = IMU.getGyroX_rads();
         float q = IMU.getGyroY_rads();
         float r = IMU.getGyroZ_rads();
-        
+            
         if (STATE_AHRS == STATE_EKF_RUNNING) {  /* Run the EKF algorithm */
             
             /* ================== Read the sensor data / simulate the system here ================== */
@@ -326,9 +326,9 @@ void loop() {
                 
                 /* Normalizing the acceleration vector & projecting the gravitational vector (gravity is negative acceleration) */
                 float_prec _normG = sqrt((Ax * Ax) + (Ay * Ay) + (Az * Az));
-                Ax = -Ax / _normG;
-                Ay = -Ay / _normG;
-                Az = -Az / _normG;
+                Ax = Ax / _normG;
+                Ay = Ay / _normG;
+                Az = Az / _normG;
                 
                 /* Normalizing the magnetic vector */
                 _normG = sqrt((Bx * Bx) + (By * By) + (Bz * Bz));
@@ -341,11 +341,12 @@ void loop() {
                 float roll = asin(Ay/cos(pitch));
                 float m_tilt_x =  Bx*cos(pitch)             + By*sin(roll)*sin(pitch)   + Bz*cos(roll)*sin(pitch);
                 float m_tilt_y =                            + By*cos(roll)              - Bz*sin(roll);
-                float m_tilt_z = -Bx*sin(pitch)             + By*sin(roll)*cos(pitch)   + Bz*cos(roll)*cos(pitch);
+                /* float m_tilt_z = -Bx*sin(pitch)             + By*sin(roll)*cos(pitch)   + Bz*cos(roll)*cos(pitch); */
                 
-                IMU_MAG_B0[0][0] = m_tilt_x;
-                IMU_MAG_B0[1][0] = m_tilt_y;
-                IMU_MAG_B0[2][0] = m_tilt_z;
+                float mag_dec = atan2(m_tilt_y, m_tilt_x);
+                IMU_MAG_B0[0][0] = cos(mag_dec);
+                IMU_MAG_B0[1][0] = sin(mag_dec);
+                IMU_MAG_B0[2][0] = 0;
                 
                 Serial.println("North identification finished, the north vector identified:");
                 snprintf(bufferTxSer, sizeof(bufferTxSer)-1, "%.3f %.3f %.3f\r\n", IMU_MAG_B0[0][0], IMU_MAG_B0[1][0], IMU_MAG_B0[2][0]);
